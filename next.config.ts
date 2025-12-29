@@ -5,6 +5,20 @@ const nextConfig: NextConfig = {
     // Skip TypeScript errors during build for production
     ignoreBuildErrors: true,
   },
+  // Use webpack for builds (required for WASM support)
+  experimental: {
+    turbo: {
+      rules: {
+        '*.wasm': {
+          loaders: ['file-loader'],
+          as: '*.wasm',
+        },
+      },
+    },
+    serverActions: {
+      bodySizeLimit: '10mb',
+    },
+  },
   webpack: (config, { isServer }) => {
     // Handle WASM files for @xenova/transformers
     config.experiments = {
@@ -19,12 +33,6 @@ const nextConfig: NextConfig = {
     });
 
     return config;
-  },
-  // Increase max duration for serverless functions (for model loading)
-  experimental: {
-    serverActions: {
-      bodySizeLimit: '10mb',
-    },
   },
 };
 
