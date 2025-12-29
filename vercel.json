@@ -1,0 +1,14 @@
+{
+  "functions": {
+    "app/api/products/route.ts": {
+      "maxDuration": 60,
+      "memory": 3008
+    },
+    "app/api/search/route.ts": {
+      "maxDuration": 30
+    }
+  },
+  "env": {
+    "VERCEL": "1"
+  }
+}
