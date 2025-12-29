@@ -1,11 +1,12 @@
 {
   "functions": {
     "app/api/products/route.ts": {
-      "maxDuration": 60,
-      "memory": 3008
+      "maxDuration": 10,
+      "memory": 1024
     },
     "app/api/search/route.ts": {
-      "maxDuration": 30
+      "maxDuration": 10,
+      "memory": 1024
     }
   },
   "env": {
