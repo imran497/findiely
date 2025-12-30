@@ -11,6 +11,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { Loader2 } from 'lucide-react'
 
 interface IndexProductDialogProps {
@@ -24,9 +25,23 @@ export default function IndexProductDialog({ open, onOpenChange }: IndexProductD
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
+  // Manual mode state
+  const [manualMode, setManualMode] = useState(false)
+  const [manualName, setManualName] = useState('')
+  const [manualDescription, setManualDescription] = useState('')
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!url.trim()) return
+
+    // If manual mode, validate manual fields
+    if (manualMode && (!manualName.trim() || !manualDescription.trim())) {
+      setMessage({
+        type: 'error',
+        text: 'Please fill in product name and description',
+      })
+      return
+    }
 
     setLoading(true)
     setMessage(null)
@@ -38,15 +53,25 @@ export default function IndexProductDialog({ open, onOpenChange }: IndexProductD
         .map(tag => tag.trim().toLowerCase())
         .filter(tag => tag.length > 0)
 
+      const requestBody: any = {
+        url: url.trim(),
+        customTags: tagsArray.length > 0 ? tagsArray : undefined,
+      }
+
+      // If manual mode, include manual data
+      if (manualMode) {
+        requestBody.manualData = {
+          name: manualName.trim(),
+          description: manualDescription.trim(),
+        }
+      }
+
       const response = await fetch('/api/products', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          url: url.trim(),
-          customTags: tagsArray.length > 0 ? tagsArray : undefined,
-        }),
+        body: JSON.stringify(requestBody),
       })
 
       if (!response.ok) {
@@ -54,6 +79,20 @@ export default function IndexProductDialog({ open, onOpenChange }: IndexProductD
         try {
           const errorData = await response.json()
           errorMessage = errorData.error || errorMessage
+
+          // Check if scraping was blocked - switch to manual mode
+          if (errorMessage.includes('forbidden') ||
+              errorMessage.includes('blocking') ||
+              errorMessage.includes('Access denied') ||
+              errorMessage.includes('Failed to fetch page')) {
+            setManualMode(true)
+            setMessage({
+              type: 'error',
+              text: '⚠️ Website blocked auto-scraping. Please enter product details manually below.',
+            })
+            setLoading(false)
+            return
+          }
         } catch {
           errorMessage = `Server error: ${response.status} ${response.statusText}`
         }
@@ -74,6 +113,9 @@ export default function IndexProductDialog({ open, onOpenChange }: IndexProductD
       // Reset form
       setUrl('')
       setCustomTags('')
+      setManualName('')
+      setManualDescription('')
+      setManualMode(false)
 
       // Close dialog after 3 seconds
       setTimeout(() => {
@@ -94,9 +136,11 @@ export default function IndexProductDialog({ open, onOpenChange }: IndexProductD
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Index Product</DialogTitle>
+          <DialogTitle>{manualMode ? 'Enter Product Details' : 'Index Product'}</DialogTitle>
           <DialogDescription>
-            Add a new indie product to the search index. We'll automatically extract all information including pricing.
+            {manualMode
+              ? 'The website blocked auto-scraping. Please enter product details manually.'
+              : "Add a new indie product to the search index. We'll automatically extract all information including pricing."}
           </DialogDescription>
         </DialogHeader>
 
@@ -110,14 +154,48 @@ export default function IndexProductDialog({ open, onOpenChange }: IndexProductD
               onChange={(e) => setUrl(e.target.value)}
               placeholder="https://yourproduct.com"
               required
-              autoFocus
+              autoFocus={!manualMode}
+              disabled={manualMode}
             />
-            <p className="text-xs text-muted-foreground">
-              • Only root domains allowed (no paths or parameters)<br />
-              • We'll extract title, description, and auto-generate tags<br />
-              • Duplicate URLs are prevented
-            </p>
+            {!manualMode && (
+              <p className="text-xs text-muted-foreground">
+                • Only root domains allowed (no paths or parameters)<br />
+                • We'll extract title, description, and auto-generate tags<br />
+                • Duplicate URLs are prevented
+              </p>
+            )}
           </div>
+
+          {/* Manual entry fields - shown only when auto-scraping fails */}
+          {manualMode && (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="name">Product Title *</Label>
+                <Input
+                  id="name"
+                  type="text"
+                  value={manualName}
+                  onChange={(e) => setManualName(e.target.value)}
+                  placeholder="Your Product Title"
+                  required
+                  autoFocus
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="description">Description *</Label>
+                <Textarea
+                  id="description"
+                  value={manualDescription}
+                  onChange={(e) => setManualDescription(e.target.value)}
+                  placeholder="Describe your product..."
+                  rows={4}
+                  required
+                  className="resize-none"
+                />
+              </div>
+            </>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="tags">Custom Tags (Optional)</Label>
@@ -129,7 +207,7 @@ export default function IndexProductDialog({ open, onOpenChange }: IndexProductD
               placeholder="saas, productivity, analytics"
             />
             <p className="text-xs text-muted-foreground">
-              Comma-separated tags to help users find your product. These will be merged with auto-generated tags.
+              Comma-separated tags to help users find your product.
             </p>
           </div>
 

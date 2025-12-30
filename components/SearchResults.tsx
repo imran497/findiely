@@ -4,6 +4,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 import { Search, Loader2, ChevronLeft, ChevronRight, Compass } from 'lucide-react'
 import { ThemeToggle } from './ThemeToggle'
 import IndexProductDialog from './IndexProductDialog'
@@ -23,6 +24,7 @@ export default function SearchResults() {
   const router = useRouter()
   const query = searchParams.get('q') || ''
   const page = parseInt(searchParams.get('page') || '1', 10)
+  const showRelevance = searchParams.get('showRelevance') === '1'
 
   const [searchQuery, setSearchQuery] = useState(query)
   const [results, setResults] = useState<Product[]>([])
@@ -185,9 +187,16 @@ export default function SearchResults() {
                         rel="noopener noreferrer"
                         className="block group"
                       >
-                        <h3 className="text-xl font-semibold text-primary group-hover:underline">
-                          {product.name}
-                        </h3>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-xl font-semibold text-primary group-hover:underline">
+                            {product.name}
+                          </h3>
+                          {showRelevance && (
+                            <Badge variant="secondary" className="text-xs font-mono">
+                              {product.score.toFixed(2)}
+                            </Badge>
+                          )}
+                        </div>
                       </a>
 
                       {/* URL */}

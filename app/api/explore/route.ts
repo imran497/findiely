@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import client, { INDEX_NAME } from '@/lib/config/opensearch'
+import tagNormalizer from '@/lib/services/tagNormalizer'
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,11 +12,13 @@ export async function GET(request: NextRequest) {
     let baseQuery: any = { match_all: {} }
 
     if (category) {
+      // Get all tags that match this category (includes synonyms)
+      const categoryTags = tagNormalizer.getCategoryTags(category.toLowerCase())
+
       baseQuery = {
         bool: {
-          must: [
-            { term: { tags: category.toLowerCase() } }
-          ]
+          should: categoryTags.map(tag => ({ term: { tags: tag } })),
+          minimum_should_match: 1
         }
       }
     }

@@ -48,7 +48,7 @@ export default function AdminPage() {
     e.preventDefault()
     setLoginError('')
 
-    if (username === 'admin' && password === 'admin') {
+    if (username === 'admin' && password === 'searchBlox@123searchBlox') {
       localStorage.setItem('adminAuth', 'authenticated')
       setIsAuthenticated(true)
       fetchStats(1, pageSize)
@@ -146,7 +146,7 @@ export default function AdminPage() {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="admin"
+                  placeholder="Enter password"
                   required
                 />
               </div>

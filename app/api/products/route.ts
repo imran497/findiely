@@ -6,11 +6,19 @@ import searchService from '@/lib/services/searchService'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    let { url, customTags } = body
+    let { url, customTags, manualData } = body
 
     if (!url) {
       return NextResponse.json(
         { error: 'URL is required' },
+        { status: 400 }
+      )
+    }
+
+    // Validate manual data if provided
+    if (manualData && (!manualData.name || !manualData.description)) {
+      return NextResponse.json(
+        { error: 'Manual data must include name and description' },
         { status: 400 }
       )
     }
@@ -57,25 +65,43 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Scrape the page and pricing
-    const scrapedData = await scraperService.fetchPageContent(url)
-    const pricingData = await scraperService.fetchPricingInfo(url)
+    let productData: any
 
-    // Merge custom tags with auto-generated tags
-    let finalTags = scrapedData.tags || []
-    if (customTags && Array.isArray(customTags) && customTags.length > 0) {
-      // Combine and deduplicate tags
-      const combinedTags = [...new Set([...customTags, ...finalTags])]
-      // Limit to 15 tags total
-      finalTags = combinedTags.slice(0, 15)
-    }
+    // If manual data is provided, use it instead of scraping
+    if (manualData) {
+      console.log('Using manual data for:', url)
 
-    // Merge scraped data with pricing and custom tags
-    const productData = {
-      ...scrapedData,
-      ...pricingData,
-      tags: finalTags,
-      url,
+      // Use manual data
+      const tags = customTags && Array.isArray(customTags) ? customTags.slice(0, 15) : []
+
+      productData = {
+        name: manualData.name,
+        description: manualData.description,
+        tags,
+        url,
+        hasPricing: false, // Manual submissions don't have pricing info
+      }
+    } else {
+      // Scrape the page and pricing
+      const scrapedData = await scraperService.fetchPageContent(url)
+      const pricingData = await scraperService.fetchPricingInfo(url)
+
+      // Merge custom tags with auto-generated tags
+      let finalTags = scrapedData.tags || []
+      if (customTags && Array.isArray(customTags) && customTags.length > 0) {
+        // Combine and deduplicate tags
+        const combinedTags = [...new Set([...customTags, ...finalTags])]
+        // Limit to 15 tags total
+        finalTags = combinedTags.slice(0, 15)
+      }
+
+      // Merge scraped data with pricing and custom tags
+      productData = {
+        ...scrapedData,
+        ...pricingData,
+        tags: finalTags,
+        url,
+      }
     }
 
     // Index the product
