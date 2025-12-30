@@ -78,9 +78,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    let productData: any
+    // Prepare indexing parameters
+    let indexingParams: any = { url }
 
-    // If manual data is provided, use it instead of scraping
+    // If manual data is provided, skip scraping in indexing service
     if (manualData) {
       console.log('[API /products] Using manual data for:', url)
       console.log('[API /products] Manual data:', {
@@ -88,56 +89,31 @@ export async function POST(request: NextRequest) {
         descriptionLength: manualData.description?.length || 0
       })
 
-      // Use manual data
-      const tags = customTags && Array.isArray(customTags) ? customTags.slice(0, 15) : []
-
-      productData = {
+      // Use manual data - indexing service will skip scraping
+      indexingParams = {
+        url,
         name: manualData.name,
         description: manualData.description,
-        tags,
-        url,
-        hasPricing: false, // Manual submissions don't have pricing info
+        tags: customTags && Array.isArray(customTags) ? customTags.slice(0, 15) : []
       }
     } else {
-      // Scrape the page and pricing
-      console.log('[API /products] Scraping page content and pricing...')
-      const scrapedData = await scraperService.fetchPageContent(url)
-      const pricingData = await scraperService.fetchPricingInfo(url)
-      console.log('[API /products] Scraped data:', {
-        name: scrapedData.name,
-        descriptionLength: scrapedData.description?.length || 0,
-        autoTags: scrapedData.tags || [],
-        hasPricing: pricingData.hasPricing
-      })
-
-      // Merge custom tags with auto-generated tags
-      let finalTags = scrapedData.tags || []
-      if (customTags && Array.isArray(customTags) && customTags.length > 0) {
-        // Combine and deduplicate tags
-        const combinedTags = [...new Set([...customTags, ...finalTags])]
-        // Limit to 15 tags total
-        finalTags = combinedTags.slice(0, 15)
-      }
-
-      // Merge scraped data with pricing and custom tags
-      productData = {
-        ...scrapedData,
-        ...pricingData,
-        tags: finalTags,
+      // Auto-scraping mode - just pass url and custom tags
+      console.log('[API /products] Auto-scraping mode')
+      indexingParams = {
         url,
+        tags: customTags && Array.isArray(customTags) ? customTags.slice(0, 15) : []
       }
     }
 
     // Index the product
     console.log('[API /products] Indexing product in OpenSearch...')
-    console.log('[API /products] Product data to index:', {
-      name: productData.name,
-      url: productData.url,
-      tags: productData.tags,
-      descriptionLength: productData.description?.length || 0
+    console.log('[API /products] Indexing params:', {
+      url: indexingParams.url,
+      hasManualName: !!indexingParams.name,
+      tagsCount: indexingParams.tags?.length || 0
     })
 
-    const result = await indexingService.indexProduct(productData)
+    const result = await indexingService.indexProduct(indexingParams)
 
     console.log('[API /products] ✓ Product indexed successfully!')
     console.log('[API /products] Result:', {
