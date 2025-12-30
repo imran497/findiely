@@ -5,10 +5,18 @@ import searchService from '@/lib/services/searchService'
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('==================== API /products POST CALLED ====================')
     const body = await request.json()
     let { url, customTags, manualData } = body
 
+    console.log('[API /products] Request body:', {
+      url,
+      customTags,
+      hasManualData: !!manualData
+    })
+
     if (!url) {
+      console.log('[API /products] ✗ Missing URL')
       return NextResponse.json(
         { error: 'URL is required' },
         { status: 400 }
@@ -24,11 +32,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate and normalize URL to root domain only
+    console.log('[API /products] Validating and normalizing URL...')
     try {
       const urlObj = new URL(url)
 
       // Check if URL has a path (other than just /)
       if (urlObj.pathname !== '/' && urlObj.pathname !== '') {
+        console.log('[API /products] ✗ URL has path:', urlObj.pathname)
         return NextResponse.json(
           { error: 'Only root domain URLs are allowed (e.g., https://example.com). Please remove any paths.' },
           { status: 400 }
@@ -37,6 +47,7 @@ export async function POST(request: NextRequest) {
 
       // Check if URL has query parameters
       if (urlObj.search) {
+        console.log('[API /products] ✗ URL has query parameters:', urlObj.search)
         return NextResponse.json(
           { error: 'Only root domain URLs are allowed. Please remove query parameters.' },
           { status: 400 }
@@ -45,7 +56,9 @@ export async function POST(request: NextRequest) {
 
       // Normalize URL: remove trailing slash and use lowercase
       url = `${urlObj.protocol}//${urlObj.hostname.toLowerCase()}`
+      console.log('[API /products] Normalized URL:', url)
     } catch (error) {
+      console.log('[API /products] ✗ Invalid URL format:', error)
       return NextResponse.json(
         { error: 'Invalid URL format' },
         { status: 400 }
@@ -53,12 +66,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Check for duplicate URL
-    console.log('Checking for duplicate URL:', url)
+    console.log('[API /products] Checking for duplicate URL:', url)
     const existingProducts = await searchService.searchByUrl(url)
-    console.log('Existing products found:', existingProducts?.length || 0)
+    console.log('[API /products] Existing products found:', existingProducts?.length || 0)
 
     if (existingProducts && existingProducts.length > 0) {
-      console.log('Duplicate detected:', url)
+      console.log('[API /products] ✗ Duplicate detected:', url)
       return NextResponse.json(
         { error: 'This product URL is already indexed' },
         { status: 409 }
@@ -69,7 +82,11 @@ export async function POST(request: NextRequest) {
 
     // If manual data is provided, use it instead of scraping
     if (manualData) {
-      console.log('Using manual data for:', url)
+      console.log('[API /products] Using manual data for:', url)
+      console.log('[API /products] Manual data:', {
+        name: manualData.name,
+        descriptionLength: manualData.description?.length || 0
+      })
 
       // Use manual data
       const tags = customTags && Array.isArray(customTags) ? customTags.slice(0, 15) : []
@@ -83,8 +100,15 @@ export async function POST(request: NextRequest) {
       }
     } else {
       // Scrape the page and pricing
+      console.log('[API /products] Scraping page content and pricing...')
       const scrapedData = await scraperService.fetchPageContent(url)
       const pricingData = await scraperService.fetchPricingInfo(url)
+      console.log('[API /products] Scraped data:', {
+        name: scrapedData.name,
+        descriptionLength: scrapedData.description?.length || 0,
+        autoTags: scrapedData.tags || [],
+        hasPricing: pricingData.hasPricing
+      })
 
       // Merge custom tags with auto-generated tags
       let finalTags = scrapedData.tags || []
@@ -105,14 +129,29 @@ export async function POST(request: NextRequest) {
     }
 
     // Index the product
+    console.log('[API /products] Indexing product in OpenSearch...')
+    console.log('[API /products] Product data to index:', {
+      name: productData.name,
+      url: productData.url,
+      tags: productData.tags,
+      descriptionLength: productData.description?.length || 0
+    })
+
     const result = await indexingService.indexProduct(productData)
+
+    console.log('[API /products] ✓ Product indexed successfully!')
+    console.log('[API /products] Result:', {
+      productId: result.product.id,
+      productName: result.product.name
+    })
 
     return NextResponse.json({
       success: true,
       product: result,
     })
   } catch (error: any) {
-    console.error('Error indexing product:', error)
+    console.error('[API /products] ✗ Error indexing product:', error)
+    console.error('[API /products] Error stack:', error.stack)
     return NextResponse.json(
       { error: error.message || 'Failed to index product' },
       { status: 500 }
