@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { useIndexDialog } from '@/contexts/IndexDialogContext'
 import { toast } from 'sonner'
+import ClaimProductDialog from './ClaimProductDialog'
 
 interface Product {
   id: string
@@ -55,6 +56,9 @@ export default function AccountDashboard() {
   const [deleting, setDeleting] = useState<string | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null)
   const [reindexConfirm, setReindexConfirm] = useState<{ id: string; name: string; updated_at?: string } | null>(null)
+
+  // Claim product dialog state
+  const [isClaimDialogOpen, setIsClaimDialogOpen] = useState(false)
 
   // Redirect if not signed in
   useEffect(() => {
@@ -293,12 +297,20 @@ export default function AccountDashboard() {
               </p>
             </div>
             {twitterUsername && (
-              <Link href="/account/products/new">
-                <Button>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Index Product
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsClaimDialogOpen(true)}
+                >
+                  Claim Product
                 </Button>
-              </Link>
+                <Link href="/account/products/new">
+                  <Button>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Index Product
+                  </Button>
+                </Link>
+              </div>
             )}
           </div>
 
@@ -521,6 +533,13 @@ export default function AccountDashboard() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Claim Product Dialog */}
+      <ClaimProductDialog
+        open={isClaimDialogOpen}
+        onOpenChange={setIsClaimDialogOpen}
+        onSuccess={fetchUserProducts}
+      />
     </div>
   )
 }

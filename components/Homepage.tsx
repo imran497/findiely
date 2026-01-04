@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Search, Compass } from 'lucide-react'
+import { Search, Compass, Plus } from 'lucide-react'
 import { ThemeToggle } from './ThemeToggle'
 import IndexProductDialog from './IndexProductDialog'
 import Link from 'next/link'
@@ -34,6 +34,18 @@ export default function Homepage() {
             <span className="text-2xl font-semibold font-patua">Findiely</span>
           </div>
           <div className="flex items-center gap-2">
+            {/* Index Product - Only for guests */}
+            <SignedOut>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={openDialog}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Index Product
+              </Button>
+            </SignedOut>
+
             <ThemeToggle />
 
             {/* Authentication */}
