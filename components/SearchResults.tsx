@@ -9,6 +9,16 @@ import { Search, Loader2, ChevronLeft, ChevronRight, Compass } from 'lucide-reac
 import { ThemeToggle } from './ThemeToggle'
 import IndexProductDialog from './IndexProductDialog'
 import Link from 'next/link'
+import { SignInButton, SignedIn, SignedOut } from '@clerk/nextjs'
+import CustomUserButton from './CustomUserButton'
+import { useIndexDialog } from '@/contexts/IndexDialogContext'
+
+// X (Twitter) Logo Component
+const XLogo = ({ className = "h-3 w-3" }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true">
+    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+  </svg>
+)
 
 interface Product {
   id: string
@@ -17,6 +27,8 @@ interface Product {
   url: string
   tags: string[]
   score: number
+  twitter_creator?: string
+  twitter_site?: string
 }
 
 export default function SearchResults() {
@@ -30,7 +42,7 @@ export default function SearchResults() {
   const [results, setResults] = useState<Product[]>([])
   const [loading, setLoading] = useState(false)
   const [metadata, setMetadata] = useState({ total: 0, took: 0 })
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const { isOpen, openDialog, closeDialog } = useIndexDialog()
 
   const RESULTS_PER_PAGE = 20
 
@@ -94,51 +106,63 @@ export default function SearchResults() {
     <div className="min-h-screen flex flex-col">
       {/* Header */}
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container max-w-7xl mx-auto flex h-16 items-center gap-4 px-4">
+        <div className="container max-w-7xl mx-auto flex h-16 items-center gap-2 sm:gap-4 px-4">
           {/* Left: Logo */}
           <button
             onClick={() => router.push('/')}
-            className="flex items-center gap-2 shrink-0 hover:opacity-80 transition-opacity"
+            className="flex items-center gap-1.5 sm:gap-2 shrink-0 hover:opacity-80 transition-opacity"
           >
-            <Search className="h-5 w-5" />
-            <span className="font-semibold font-patua text-xl">Findiely</span>
+            <Search className="h-4 w-4 sm:h-5 sm:w-5" />
+            <span className="font-semibold font-patua text-lg sm:text-xl">Findiely</span>
           </button>
 
           {/* Center: Search */}
           <form onSubmit={handleSearchSubmit} className="flex-1 max-w-2xl mx-auto">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search for indie products..."
-                className="pl-10 h-10"
+                placeholder="Search..."
+                className="pl-8 sm:pl-10 h-9 sm:h-10 text-sm"
               />
             </div>
           </form>
 
           {/* Right: Actions */}
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => router.push('/explore')}
-              className="hidden sm:flex"
+              title="Explore Random Products"
             >
-              <Compass className="h-4 w-4 mr-2" />
-              Explore
-            </Button>
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsDialogOpen(true)}
-            >
-              Index Product
+              <Compass className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Explore</span>
             </Button>
 
             <ThemeToggle />
+
+            {/* Authentication */}
+            <SignedOut>
+              <SignInButton mode="modal">
+                <Button variant="default" size="sm" className="hidden sm:flex">
+                  Sign In
+                </Button>
+              </SignInButton>
+              <SignInButton mode="modal">
+                <Button variant="default" size="icon" className="sm:hidden h-9 w-9">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                  </svg>
+                </Button>
+              </SignInButton>
+            </SignedOut>
+            <SignedIn>
+              <CustomUserButton />
+            </SignedIn>
           </div>
         </div>
       </header>
@@ -214,18 +238,19 @@ export default function SearchResults() {
                         {product.description || 'No description available'}
                       </p>
 
-                      {/* Tags */}
-                      {product.tags && product.tags.length > 0 && (
-                        <div className="flex gap-2 flex-wrap">
-                          {product.tags.map((tag, i) => (
-                            <span
-                              key={i}
-                              className="text-xs px-2 py-1 rounded bg-secondary text-secondary-foreground"
-                            >
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
+                      {/* Twitter Creator */}
+                      {product.twitter_creator && (
+                        <a
+                          href={`https://twitter.com/${product.twitter_creator}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title={`View @${product.twitter_creator} on X/Twitter`}
+                        >
+                          <Badge className="inline-flex items-center gap-1.5 bg-black dark:bg-white text-white dark:text-black hover:bg-black/80 dark:hover:bg-white/80 transition-colors cursor-pointer border-0">
+                            <XLogo className="h-3 w-3" />
+                            <span>@{product.twitter_creator}</span>
+                          </Badge>
+                        </a>
                       )}
                     </div>
                   </div>
@@ -277,7 +302,7 @@ export default function SearchResults() {
                 <Button
                   variant="outline"
                   className="mt-4"
-                  onClick={() => setIsDialogOpen(true)}
+                  onClick={() => openDialog()}
                 >
                   Index a Product
                 </Button>
@@ -306,8 +331,8 @@ export default function SearchResults() {
       </footer>
 
       <IndexProductDialog
-        open={isDialogOpen}
-        onOpenChange={setIsDialogOpen}
+        open={isOpen}
+        onOpenChange={closeDialog}
       />
     </div>
   )

@@ -2,10 +2,22 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Loader2, Search, RefreshCw } from 'lucide-react'
 import { ThemeToggle } from './ThemeToggle'
 import IndexProductDialog from './IndexProductDialog'
 import Link from 'next/link'
+import { SignInButton, SignedIn, SignedOut } from '@clerk/nextjs'
+import CustomUserButton from './CustomUserButton'
+import { useIndexDialog } from '@/contexts/IndexDialogContext'
+import { CATEGORIES } from '@/lib/constants/categories'
+
+// X (Twitter) Logo Component
+const XLogo = ({ className = "h-3 w-3" }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true">
+    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+  </svg>
+)
 
 interface Product {
   id: string
@@ -13,19 +25,13 @@ interface Product {
   description: string
   url: string
   tags: string[]
+  twitter_creator?: string
+  twitter_site?: string
 }
 
-const CATEGORIES = [
+const CATEGORY_OPTIONS = [
   { label: 'All', value: null },
-  { label: 'SaaS', value: 'saas' },
-  { label: 'Payments', value: 'payments' },
-  { label: 'Productivity', value: 'productivity' },
-  { label: 'Analytics', value: 'analytics' },
-  { label: 'AI', value: 'ai' },
-  { label: 'Design', value: 'design' },
-  { label: 'Development', value: 'development' },
-  { label: 'Marketing', value: 'marketing' },
-  { label: 'Finance', value: 'finance' },
+  ...CATEGORIES,
 ]
 
 export default function ExploreResults() {
@@ -33,7 +39,7 @@ export default function ExploreResults() {
   const [results, setResults] = useState<Product[]>([])
   const [loading, setLoading] = useState(false)
   const [metadata, setMetadata] = useState({ total: 0, took: 0 })
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const { isOpen, openDialog, closeDialog } = useIndexDialog()
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
 
   useEffect(() => {
@@ -79,41 +85,53 @@ export default function ExploreResults() {
     <div className="min-h-screen flex flex-col">
       {/* Header */}
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container max-w-7xl mx-auto flex h-16 items-center gap-4 px-4">
+        <div className="container max-w-7xl mx-auto flex h-16 items-center gap-2 sm:gap-4 px-4">
           {/* Left: Logo */}
           <button
             onClick={() => router.push('/')}
-            className="flex items-center gap-2 shrink-0 hover:opacity-80 transition-opacity"
+            className="flex items-center gap-1.5 sm:gap-2 shrink-0 hover:opacity-80 transition-opacity"
           >
-            <Search className="h-5 w-5" />
-            <span className="font-semibold font-patua text-xl">Findiely</span>
-            <span className="text-muted-foreground text-sm hidden sm:inline">/ Explore</span>
+            <Search className="h-4 w-4 sm:h-5 sm:w-5" />
+            <span className="font-semibold font-patua text-lg sm:text-xl">Findiely</span>
+            <span className="text-muted-foreground text-xs sm:text-sm hidden sm:inline">/ Explore</span>
           </button>
 
           {/* Spacer */}
           <div className="flex-1" />
 
           {/* Right: Actions */}
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
             <Button
               variant="outline"
               size="sm"
               onClick={fetchRandomProducts}
               disabled={loading}
             >
-              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsDialogOpen(true)}
-            >
-              Index Product
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''} sm:mr-2`} />
+              <span className="hidden sm:inline">Refresh</span>
             </Button>
 
             <ThemeToggle />
+
+            {/* Authentication */}
+            <SignedOut>
+              <SignInButton mode="modal">
+                <Button variant="default" size="sm" className="hidden sm:flex">
+                  Sign In
+                </Button>
+              </SignInButton>
+              <SignInButton mode="modal">
+                <Button variant="default" size="icon" className="sm:hidden h-9 w-9">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                  </svg>
+                </Button>
+              </SignInButton>
+            </SignedOut>
+            <SignedIn>
+              <CustomUserButton />
+            </SignedIn>
           </div>
         </div>
       </header>
@@ -130,7 +148,7 @@ export default function ExploreResults() {
 
             {/* Category Filters */}
             <div className="flex flex-wrap gap-2">
-              {CATEGORIES.map((category) => (
+              {CATEGORY_OPTIONS.map((category) => (
                 <button
                   key={category.label}
                   onClick={() => setSelectedCategory(category.value)}
@@ -199,18 +217,19 @@ export default function ExploreResults() {
                       {product.description || 'No description available'}
                     </p>
 
-                    {/* Tags */}
-                    {product.tags && product.tags.length > 0 && (
-                      <div className="flex gap-2 flex-wrap">
-                        {product.tags.map((tag, i) => (
-                          <span
-                            key={i}
-                            className="text-xs px-2 py-1 rounded bg-secondary text-secondary-foreground"
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
+                    {/* Twitter Creator */}
+                    {product.twitter_creator && (
+                      <a
+                        href={`https://twitter.com/${product.twitter_creator}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={`View @${product.twitter_creator} on X/Twitter`}
+                      >
+                        <Badge className="inline-flex items-center gap-1.5 bg-black dark:bg-white text-white dark:text-black hover:bg-black/80 dark:hover:bg-white/80 transition-colors cursor-pointer border-0">
+                          <XLogo className="h-3 w-3" />
+                          <span>@{product.twitter_creator}</span>
+                        </Badge>
+                      </a>
                     )}
                   </div>
                 </div>
@@ -241,7 +260,7 @@ export default function ExploreResults() {
               <Button
                 variant="outline"
                 className="mt-4"
-                onClick={() => setIsDialogOpen(true)}
+                onClick={() => openDialog()}
               >
                 Index a Product
               </Button>
@@ -269,8 +288,8 @@ export default function ExploreResults() {
       </footer>
 
       <IndexProductDialog
-        open={isDialogOpen}
-        onOpenChange={setIsDialogOpen}
+        open={isOpen}
+        onOpenChange={closeDialog}
       />
     </div>
   )

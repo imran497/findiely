@@ -167,3 +167,9 @@
 .indie-highlight:hover span:last-child {
   animation: indie-shimmer 2s ease infinite;
 }
+
+/* Hide Clerk's Manage Account button */
+button[data-localization-key="userButton.action__manageAccount"],
+[class*="userButtonPopoverActionButton__manageAccount"] {
+  display: none !important;
+}

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { auth, clerkClient } from '@clerk/nextjs/server'
 import scraperService from '@/lib/services/scraperService'
 import indexingService from '@/lib/services/indexingService'
 import searchService from '@/lib/services/searchService'
@@ -7,11 +8,12 @@ export async function POST(request: NextRequest) {
   try {
     console.log('==================== API /products POST CALLED ====================')
     const body = await request.json()
-    let { url, customTags, manualData } = body
+    let { url, customTags, categories, manualData, skipOwnershipCheck } = body
 
     console.log('[API /products] Request body:', {
       url,
       customTags,
+      categories,
       hasManualData: !!manualData
     })
 
@@ -78,6 +80,76 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Get authentication info and determine who is indexing
+    const { userId } = await auth()
+    let indexedBy = 'guest' // Default to guest
+    let userTwitterHandle = null
+
+    if (userId && !skipOwnershipCheck) {
+      console.log('[API /products] Validating ownership for authenticated user...')
+
+      try {
+        // Get user's Twitter username from Clerk
+        const clerk = await clerkClient()
+        const user = await clerk.users.getUser(userId)
+        const twitterAccount = user.externalAccounts.find(
+          (account) =>
+            account.provider === 'oauth_twitter' ||
+            account.provider === 'twitter' ||
+            account.provider === 'oauth_x' ||
+            account.provider === 'x'
+        )
+
+        if (twitterAccount?.username) {
+          userTwitterHandle = twitterAccount.username.toLowerCase()
+          indexedBy = `@${userTwitterHandle}` // Set indexed_by to twitter handle
+          console.log('[API /products] User Twitter handle:', userTwitterHandle)
+
+          // Scrape the URL to check twitter:creator meta tag
+          let scrapedTwitterCreator = null
+
+          try {
+            const pageContent = await scraperService.fetchPageContent(url)
+            scrapedTwitterCreator = pageContent.twitter_creator?.toLowerCase()
+            console.log('[API /products] Scraped twitter:creator:', scrapedTwitterCreator || 'not found')
+          } catch (scrapeError) {
+            console.log('[API /products] Could not scrape URL for ownership check:', scrapeError)
+            // If we can't scrape, we'll check manual data or reject
+          }
+
+          // Check ownership
+          const expectedTwitterCreator = scrapedTwitterCreator || manualData?.twitter_creator?.toLowerCase()
+
+          if (!expectedTwitterCreator) {
+            console.log('[API /products] ✗ No twitter:creator meta tag found')
+            return NextResponse.json(
+              {
+                error: 'Ownership validation failed',
+                details: `No twitter:creator meta tag found on ${url}. To index this product, you need to add <meta name="twitter:creator" content="@${userTwitterHandle}"> to your website's <head> section.`
+              },
+              { status: 403 }
+            )
+          }
+
+          if (expectedTwitterCreator !== userTwitterHandle) {
+            console.log('[API /products] ✗ Twitter creator mismatch')
+            return NextResponse.json(
+              {
+                error: 'Ownership validation failed',
+                details: `The twitter:creator meta tag on ${url} is set to "@${expectedTwitterCreator}" but you're signed in as "@${userTwitterHandle}". Only the owner can index this product.`
+              },
+              { status: 403 }
+            )
+          }
+
+          console.log('[API /products] ✓ Ownership validated')
+        }
+      } catch (authError) {
+        console.log('[API /products] Auth error during ownership check:', authError)
+        // Continue without ownership validation if auth check fails
+      }
+    }
+
     // Prepare indexing parameters
     let indexingParams: any = { url }
 
@@ -94,14 +166,18 @@ export async function POST(request: NextRequest) {
         url,
         name: manualData.name,
         description: manualData.description,
-        tags: customTags && Array.isArray(customTags) ? customTags.slice(0, 15) : []
+        tags: customTags && Array.isArray(customTags) ? customTags.slice(0, 15) : [],
+        categories: categories && Array.isArray(categories) ? categories.slice(0, 5) : [],
+        indexed_by: indexedBy
       }
     } else {
       // Auto-scraping mode - just pass url and custom tags
       console.log('[API /products] Auto-scraping mode')
       indexingParams = {
         url,
-        tags: customTags && Array.isArray(customTags) ? customTags.slice(0, 15) : []
+        tags: customTags && Array.isArray(customTags) ? customTags.slice(0, 15) : [],
+        categories: categories && Array.isArray(categories) ? categories.slice(0, 5) : [],
+        indexed_by: indexedBy
       }
     }
 

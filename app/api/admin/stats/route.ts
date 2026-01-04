@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
         query: {
           match_all: {}
         },
-        _source: ['name', 'url', 'tags', 'description'],
+        _source: ['name', 'url', 'tags', 'description', 'twitter_creator', 'twitter_site', 'indexed_by'],
         sort: [
           { _id: 'asc' }
         ]
@@ -29,7 +29,10 @@ export async function GET(request: NextRequest) {
       name: hit._source.name,
       url: hit._source.url,
       tags: hit._source.tags || [],
-      description: hit._source.description || ''
+      description: hit._source.description || '',
+      twitter_creator: hit._source.twitter_creator || null,
+      twitter_site: hit._source.twitter_site || null,
+      indexed_by: hit._source.indexed_by || null
     }))
 
     const total = typeof response.body.hits.total === 'object'

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useUser } from '@clerk/nextjs'
 import {
   Dialog,
   DialogContent,
@@ -12,23 +13,35 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Loader2 } from 'lucide-react'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Loader2, AlertCircle, Info } from 'lucide-react'
+import { TagInput } from '@/components/ui/tag-input'
+import { CategorySelect } from '@/components/ui/category-select'
+import { toast } from 'sonner'
 
 interface IndexProductDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  onSuccess?: () => void
 }
 
-export default function IndexProductDialog({ open, onOpenChange }: IndexProductDialogProps) {
+export default function IndexProductDialog({ open, onOpenChange, onSuccess }: IndexProductDialogProps) {
+  const { user } = useUser()
   const [url, setUrl] = useState('')
-  const [customTags, setCustomTags] = useState('')
+  const [customTags, setCustomTags] = useState<string[]>([])
+  const [categories, setCategories] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [message, setMessage] = useState<{ type: 'success' | 'error' | 'warning'; text: string } | null>(null)
 
   // Manual mode state
   const [manualMode, setManualMode] = useState(false)
   const [manualName, setManualName] = useState('')
   const [manualDescription, setManualDescription] = useState('')
+
+  // Get user's Twitter username
+  const twitterUsername = user?.externalAccounts?.find(
+    (account) => account.provider === 'oauth_twitter'
+  )?.username
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -47,15 +60,10 @@ export default function IndexProductDialog({ open, onOpenChange }: IndexProductD
     setMessage(null)
 
     try {
-      // Parse custom tags from comma-separated string
-      const tagsArray = customTags
-        .split(',')
-        .map(tag => tag.trim().toLowerCase())
-        .filter(tag => tag.length > 0)
-
       const requestBody: any = {
         url: url.trim(),
-        customTags: tagsArray.length > 0 ? tagsArray : undefined,
+        customTags: customTags.length > 0 ? customTags : undefined,
+        categories: categories.length > 0 ? categories : undefined,
       }
 
       // If manual mode, include manual data
@@ -76,9 +84,21 @@ export default function IndexProductDialog({ open, onOpenChange }: IndexProductD
 
       if (!response.ok) {
         let errorMessage = 'Failed to index product'
+        let errorDetails = ''
         try {
           const errorData = await response.json()
           errorMessage = errorData.error || errorMessage
+          errorDetails = errorData.details || ''
+
+          // Check if ownership validation failed
+          if (response.status === 403 && errorMessage.includes('Ownership validation')) {
+            setMessage({
+              type: 'error',
+              text: `⚠️ ${errorMessage}\n\n${errorDetails}`,
+            })
+            setLoading(false)
+            return
+          }
 
           // Check if scraping was blocked - switch to manual mode
           if (errorMessage.includes('forbidden') ||
@@ -102,26 +122,42 @@ export default function IndexProductDialog({ open, onOpenChange }: IndexProductD
       const data = await response.json()
       const product = data.product.product || data.product
 
-      const tagsList = product.tags?.join(', ') || 'none'
       const pricingInfo = product.hasPricing ? ' Pricing information found!' : ''
 
-      setMessage({
-        type: 'success',
-        text: `✓ Success! "${product.name}" has been indexed.${pricingInfo}\n\nTags: ${tagsList}`,
+      // Show success toast with tags in green
+      const tagBadges = product.tags?.map((tag: string) =>
+        `<span style="display: inline-block; background-color: #22c55e; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; margin: 2px;">${tag}</span>`
+      ).join(' ') || '<span>No tags</span>'
+
+      toast.success(`Product "${product.name}" indexed successfully!`, {
+        description: (
+          <div>
+            {pricingInfo && <p className="mb-2">{pricingInfo}</p>}
+            <div className="mt-2">
+              <strong>Tags:</strong>
+              <div className="mt-1" dangerouslySetInnerHTML={{ __html: tagBadges }} />
+            </div>
+          </div>
+        ),
+        duration: 5000,
       })
+
+      // Call onSuccess callback to refresh parent list
+      onSuccess?.()
 
       // Reset form
       setUrl('')
-      setCustomTags('')
+      setCustomTags([])
+      setCategories([])
       setManualName('')
       setManualDescription('')
       setManualMode(false)
 
-      // Close dialog after 3 seconds
+      // Close dialog after 2 seconds
       setTimeout(() => {
         onOpenChange(false)
         setMessage(null)
-      }, 3000)
+      }, 2000)
     } catch (error) {
       setMessage({
         type: 'error',
@@ -143,6 +179,19 @@ export default function IndexProductDialog({ open, onOpenChange }: IndexProductD
               : "Add a new indie product to the search index. We'll automatically extract all information including pricing."}
           </DialogDescription>
         </DialogHeader>
+
+        {/* Ownership requirement alert for authenticated Twitter users */}
+        {twitterUsername && (
+          <Alert className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+            <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            <AlertDescription className="text-sm text-blue-900 dark:text-blue-100">
+              <strong>Ownership Verification:</strong> To index your product, ensure your website includes the following meta tag in the &lt;head&gt; section:
+              <code className="block mt-2 p-2 bg-blue-100 dark:bg-blue-900 rounded text-xs">
+                &lt;meta name="twitter:creator" content="@{twitterUsername}"&gt;
+              </code>
+            </AlertDescription>
+          </Alert>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
@@ -198,16 +247,27 @@ export default function IndexProductDialog({ open, onOpenChange }: IndexProductD
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="tags">Custom Tags (Optional)</Label>
-            <Input
-              id="tags"
-              type="text"
-              value={customTags}
-              onChange={(e) => setCustomTags(e.target.value)}
-              placeholder="saas, productivity, analytics"
+            <Label htmlFor="categories">Categories (Optional)</Label>
+            <CategorySelect
+              selectedCategories={categories}
+              onChange={setCategories}
+              maxCategories={5}
             />
             <p className="text-xs text-muted-foreground">
-              Comma-separated tags to help users find your product.
+              Select up to 5 categories that best describe your product. This helps users discover your product through category filters.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="tags">Custom Tags (Optional)</Label>
+            <TagInput
+              tags={customTags}
+              onChange={setCustomTags}
+              placeholder="Type tag and press comma or enter..."
+              maxTags={15}
+            />
+            <p className="text-xs text-muted-foreground">
+              Add tags by typing and pressing comma or enter. AI will automatically expand these to include related terms.
             </p>
           </div>
 
@@ -228,6 +288,8 @@ export default function IndexProductDialog({ open, onOpenChange }: IndexProductD
             className={`p-3 rounded-md text-sm whitespace-pre-line ${
               message.type === 'success'
                 ? 'bg-green-50 dark:bg-green-950 text-green-900 dark:text-green-100 border border-green-200 dark:border-green-800'
+                : message.type === 'warning'
+                ? 'bg-amber-50 dark:bg-amber-950 text-amber-900 dark:text-amber-100 border border-amber-200 dark:border-amber-800'
                 : 'bg-red-50 dark:bg-red-950 text-red-900 dark:text-red-100 border border-red-200 dark:border-red-800'
             }`}
           >

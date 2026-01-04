@@ -7,13 +7,18 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "reset-index": "node scripts/reset-index.js"
   },
   "dependencies": {
+    "@clerk/nextjs": "^6.36.5",
     "@fontsource/space-grotesk": "^5.2.10",
     "@opensearch-project/opensearch": "^3.5.1",
+    "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-dialog": "^1.1.15",
+    "@radix-ui/react-dropdown-menu": "^2.1.16",
     "@radix-ui/react-label": "^2.1.8",
+    "@radix-ui/react-popover": "^1.1.15",
     "@radix-ui/react-slot": "^1.2.4",
     "axios": "^1.13.2",
     "cheerio": "^1.1.2",
@@ -22,8 +27,10 @@
     "dotenv": "^17.2.3",
     "lucide-react": "^0.562.0",
     "next": "16.1.1",
+    "next-themes": "^0.4.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {

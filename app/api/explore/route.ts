@@ -15,9 +15,16 @@ export async function GET(request: NextRequest) {
       // Get all tags that match this category (includes synonyms)
       const categoryTags = tagNormalizer.getCategoryTags(category.toLowerCase())
 
+      // Filter by both categories field AND tags
       baseQuery = {
         bool: {
-          should: categoryTags.map(tag => ({ term: { tags: tag } })),
+          should: [
+            // Match in categories field
+            { term: { 'categories.keyword': category } },
+            { term: { categories: category } },
+            // Match in tags field
+            ...categoryTags.map(tag => ({ term: { tags: tag } }))
+          ],
           minimum_should_match: 1
         }
       }

@@ -8,11 +8,14 @@ import { Search, Compass } from 'lucide-react'
 import { ThemeToggle } from './ThemeToggle'
 import IndexProductDialog from './IndexProductDialog'
 import Link from 'next/link'
+import { SignInButton, SignedIn, SignedOut } from '@clerk/nextjs'
+import CustomUserButton from './CustomUserButton'
+import { useIndexDialog } from '@/contexts/IndexDialogContext'
 
 export default function Homepage() {
   const [query, setQuery] = useState('')
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
   const router = useRouter()
+  const { isOpen, openDialog, closeDialog } = useIndexDialog()
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -31,10 +34,19 @@ export default function Homepage() {
             <span className="text-2xl font-semibold font-patua">Findiely</span>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => setIsDialogOpen(true)}>
-              Index Product
-            </Button>
             <ThemeToggle />
+
+            {/* Authentication */}
+            <SignedOut>
+              <SignInButton mode="modal">
+                <Button variant="default" size="sm">
+                  Sign In
+                </Button>
+              </SignInButton>
+            </SignedOut>
+            <SignedIn>
+              <CustomUserButton />
+            </SignedIn>
           </div>
         </div>
       </header>
@@ -105,8 +117,8 @@ export default function Homepage() {
       </footer>
 
       <IndexProductDialog
-        open={isDialogOpen}
-        onOpenChange={setIsDialogOpen}
+        open={isOpen}
+        onOpenChange={closeDialog}
       />
     </div>
   )

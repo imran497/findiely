@@ -1,0 +1,13 @@
+import { auth } from '@clerk/nextjs/server'
+import { redirect } from 'next/navigation'
+import AccountDashboard from '@/components/AccountDashboard'
+
+export default async function AccountPage() {
+  const { userId } = await auth()
+
+  if (!userId) {
+    redirect('/sign-in')
+  }
+
+  return <AccountDashboard />
+}

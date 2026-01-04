@@ -2,6 +2,10 @@ import type { Metadata } from "next";
 import { Space_Grotesk, Patua_One } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { ClerkProvider } from '@clerk/nextjs';
+import { IndexDialogProvider } from "@/contexts/IndexDialogContext";
+import { Toaster } from "@/components/ui/sonner";
+import { AuthMutex } from "@/components/AuthMutex";
 
 const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
@@ -127,9 +131,15 @@ export default function RootLayout({
         />
       </head>
       <body className={`${spaceGrotesk.variable} ${patuaOne.variable} font-sans antialiased`}>
-        <ThemeProvider defaultTheme="system">
-          {children}
-        </ThemeProvider>
+        <ClerkProvider>
+          <ThemeProvider defaultTheme="system">
+            <IndexDialogProvider>
+              <AuthMutex />
+              {children}
+              <Toaster />
+            </IndexDialogProvider>
+          </ThemeProvider>
+        </ClerkProvider>
       </body>
     </html>
   );
